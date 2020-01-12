@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/influxdata/telegraf/internal"
-	"github.com/influxdata/telegraf/testutil"
+	"github.com/influxdata/telegraf/internal/testutil"
 )
 
 func TestJobRequest(t *testing.T) {
@@ -468,6 +468,19 @@ func TestGatherJobs(t *testing.T) {
 						Result:    "FAILURE",
 						Duration:  1558,
 						Timestamp: (time.Now().Unix() - int64(time.Minute.Seconds())) * 1000,
+						Actions: []map[string]interface{}{
+							{
+								"_class": "com.sonyericsson.jenkins.plugins.bfa.model.FailureCauseBuildAction",
+								"foundFailureCauses": []map[string]interface{}{
+									{
+										"categories": nil,
+										"description": "Failure due to disk full",
+										"id": "caf2939c-50f1-4455-87c4-f365b5c95fd4",
+										"name": "Disk Full",
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -477,6 +490,7 @@ func TestGatherJobs(t *testing.T) {
 						Tags: map[string]string{
 							"name":   "job1",
 							"result": "SUCCESS",
+							"failureCause": "unknown",
 						},
 						Fields: map[string]interface{}{
 							"duration":    int64(25558),
@@ -487,6 +501,7 @@ func TestGatherJobs(t *testing.T) {
 						Tags: map[string]string{
 							"name":   "job2",
 							"result": "FAILURE",
+							"failureCause": "Disk Full",
 						},
 						Fields: map[string]interface{}{
 							"duration":    int64(1558),

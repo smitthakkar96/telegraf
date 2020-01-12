@@ -3,6 +3,7 @@ package agent
 import (
 	"log"
 	"time"
+	"runtime"
 
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/metric"
@@ -107,11 +108,12 @@ func (ac *accumulator) addFields(
 // AddError passes a runtime error to the accumulator.
 // The error will be tagged with the plugin name and written to the log.
 func (ac *accumulator) AddError(err error) {
+	_, fn, line, _ := runtime.Caller(1)
 	if err == nil {
 		return
 	}
 	NErrors.Incr(1)
-	log.Printf("E! [%s] Error in plugin: %v", ac.maker.LogName(), err)
+	log.Printf("E! [%s] Error in plugin %s:%d: %v", ac.maker.LogName(), fn, line, err)
 }
 
 func (ac *accumulator) SetPrecision(precision time.Duration) {

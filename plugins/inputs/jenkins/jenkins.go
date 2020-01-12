@@ -292,6 +292,7 @@ func (j *Jenkins) getJobDetail(jr jobRequest, acc telegraf.Accumulator) error {
 	var wg sync.WaitGroup
 	for k, ij := range js.Jobs {
 		if k < len(js.Jobs)-j.MaxSubJobPerLayer-1 {
+			fmt.Println("Skipping %s", ij)
 			continue
 		}
 		wg.Add(1)
@@ -303,6 +304,7 @@ func (j *Jenkins) getJobDetail(jr jobRequest, acc telegraf.Accumulator) error {
 				parents: jr.combined(),
 				layer:   jr.layer + 1,
 			}, acc); err != nil {
+				fmt.Println("Error in fetching job details for job %s %s", ij.Name, jr.combined())
 				acc.AddError(err)
 			}
 		}(ij, jr, acc)
@@ -317,6 +319,7 @@ func (j *Jenkins) getJobDetail(jr jobRequest, acc telegraf.Accumulator) error {
 	}
 	build, err := j.client.getBuild(context.Background(), jr, number)
 	if err != nil {
+		fmt.Println(err)
 		return err
 	}
 
@@ -395,6 +398,7 @@ type buildResponse struct {
 	Duration  int64  `json:"duration"`
 	Result    string `json:"result"`
 	Timestamp int64  `json:"timestamp"`
+	Actions   []map[string]interface{} `json: "actions"`
 }
 
 func (b *buildResponse) GetTimestamp() time.Time {
@@ -403,7 +407,7 @@ func (b *buildResponse) GetTimestamp() time.Time {
 
 const (
 	nodePath = "/computer/api/json"
-	jobPath  = "/api/json"
+	jobPath  = "/api/json?depth=2"
 )
 
 type jobRequest struct {
@@ -432,8 +436,25 @@ func (jr jobRequest) parentsString() string {
 	return strings.Join(jr.parents, "/")
 }
 
+func getFailureCauseAction(b buildResponse) string {
+	reason := "unknown"
+
+	for _, element := range b.Actions {
+		if element["_class"] == "com.sonyericsson.jenkins.plugins.bfa.model.FailureCauseBuildAction" {
+			fmt.Println(element["foundFailureCauses"])
+			foundFailureCauses := element["foundFailureCauses"].([]interface{})
+			if len(foundFailureCauses) != 0 {
+				reason = foundFailureCauses[0].(map[string]interface{})["name"].(string)
+				break
+			}
+		}
+	}
+	return reason
+}
+
 func gatherJobBuild(jr jobRequest, b *buildResponse, acc telegraf.Accumulator) {
-	tags := map[string]string{"name": jr.name, "parents": jr.parentsString(), "result": b.Result}
+	tags := map[string]string{"name": jr.name, "parents": jr.parentsString(), "result": b.Result, "failureCause": getFailureCauseAction(*b)}
+
 	fields := make(map[string]interface{})
 	fields["duration"] = b.Duration
 	fields["result_code"] = mapResultCode(b.Result)
