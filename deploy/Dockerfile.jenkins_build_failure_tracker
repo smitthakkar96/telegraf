@@ -1,0 +1,12 @@
+FROM ubuntu:16.04
+# Install prerequisites
+RUN apt-get update && apt-get install -y wget
+RUN wget https://github.com/smitthakkar96/telegraf/releases/download/v1.13.2/telegraf.tar.gz
+RUN tar xvzf telegraf.tar.gz
+
+
+FROM alpine:3.7
+COPY telegraf.conf /etc/telegraf.conf
+COPY *.sh /
+COPY --from=0 /telegraf .
+CMD ["./entrypoint.sh"]
